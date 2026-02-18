@@ -226,6 +226,25 @@
             background: rgba(77, 171, 247, 0.1);
         }
 
+        .period-btn {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            padding: 5px 10px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .period-btn:hover { border-color: #3a3a3a; }
+        .period-btn.active {
+            border-color: var(--btc-color);
+            color: var(--btc-color);
+            background: rgba(247, 147, 26, 0.1);
+        }
+
         /* Correlation Table */
         .corr-section {
             background: var(--bg-secondary);
@@ -367,6 +386,7 @@
         .share-btn.twitter:hover { border-color: #1da1f2; color: #1da1f2; }
         .share-btn.kakao:hover { border-color: #fee500; color: #fee500; }
         .share-btn.telegram:hover { border-color: #26a5e4; color: #26a5e4; }
+        .share-btn.instagram:hover { border-color: #E4405F; color: #E4405F; }
         .share-btn.copy-link:hover { border-color: var(--accent-green); color: var(--accent-green); }
 
         /* Footer */
@@ -384,18 +404,6 @@
         }
 
         .footer a:hover { color: var(--text-primary); }
-
-        /* Watermark */
-        .chart-watermark {
-            position: absolute;
-            bottom: 40px;
-            right: 30px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.65rem;
-            color: rgba(255,255,255,0.06);
-            pointer-events: none;
-            z-index: 1;
-        }
 
         /* Mobile */
         @media (max-width: 768px) {
@@ -499,10 +507,16 @@
                 <button class="lead-btn" data-lead="12">12주</button>
                 <button class="lead-btn" data-lead="16">16주</button>
             </div>
+            <div class="lead-selector">
+                <label>기간:</label>
+                <button class="period-btn" data-period="36">3Y</button>
+                <button class="period-btn" data-period="60">5Y</button>
+                <button class="period-btn" data-period="120">10Y</button>
+                <button class="period-btn active" data-period="0">ALL</button>
+            </div>
             <div class="chart-container">
                 <canvas id="mainChart"></canvas>
             </div>
-            <div class="chart-watermark">herdvibe.com</div>
         </section>
 
         <!-- Correlation Analysis -->
@@ -545,6 +559,10 @@
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
                 텔레그램
             </button>
+            <button class="share-btn instagram" onclick="shareInstagram()">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+                인스타그램
+            </button>
             <button class="share-btn copy-link" onclick="copyLink()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
                 링크 복사
@@ -574,6 +592,7 @@
         let DATA = null;
         let mainChart = null;
         let currentLead = 10; // weeks
+        let currentPeriod = 0; // months (0 = ALL)
 
         // ============================================================
         // DATA LOADING
@@ -613,7 +632,7 @@
             return den === 0 ? 0 : num / den;
         }
 
-        function getAlignedData(leadWeeks) {
+        function getAlignedData(leadWeeks, periodMonths) {
             const btc = DATA.btc_monthly_avg;
             const m2 = DATA.global_m2;
             const leadMonths = Math.round(leadWeeks / 4.33);
@@ -643,11 +662,21 @@
                 }
             });
 
+            // Apply period filter (take last N months)
+            if (periodMonths > 0 && alignedDates.length > periodMonths) {
+                const start = alignedDates.length - periodMonths;
+                return {
+                    btcValues: alignedBtc.slice(start),
+                    m2Values: alignedM2.slice(start),
+                    dates: alignedDates.slice(start)
+                };
+            }
+
             return { btcValues: alignedBtc, m2Values: alignedM2, dates: alignedDates };
         }
 
         function calculateCorrelations(leadWeeks) {
-            const { btcValues, m2Values, dates } = getAlignedData(leadWeeks);
+            const { btcValues, m2Values, dates } = getAlignedData(leadWeeks, 0);
             const n = btcValues.length;
 
             const periods = [
@@ -673,19 +702,68 @@
         }
 
         // ============================================================
+        // CHART.JS WATERMARK PLUGIN
+        // ============================================================
+        const watermarkPlugin = {
+            id: 'watermark',
+            afterDraw(chart) {
+                const { ctx, chartArea } = chart;
+                if (!chartArea) return;
+                ctx.save();
+                ctx.font = '12px JetBrains Mono';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText('herdvibe.com', chartArea.right - 8, chartArea.bottom - 8);
+                ctx.restore();
+            }
+        };
+
+        // ============================================================
         // CHART
         // ============================================================
-        function createMainChart(leadWeeks) {
-            const { btcValues, m2Values, dates } = getAlignedData(leadWeeks);
+        function createMainChart(leadWeeks, periodMonths) {
+            const { btcValues, m2Values, dates } = getAlignedData(leadWeeks, periodMonths);
+            const totalMonths = dates.length;
 
             const ctx = document.getElementById('mainChart').getContext('2d');
             if (mainChart) mainChart.destroy();
 
-            // Prepare labels
-            const labels = dates.map(d => {
-                const [y, m] = d.split('-');
-                return m === '01' ? y : '';
-            });
+            // Adaptive X-axis tick logic
+            function getTickCallback(totalMonths) {
+                if (totalMonths <= 40) {
+                    // 3Y: show quarterly Jan, Apr, Jul, Oct
+                    return function(val, idx) {
+                        const d = this.getLabelForValue(val);
+                        if (!d) return '';
+                        const [y, m] = d.split('-');
+                        if (m === '01') return `${y} Jan`;
+                        if (m === '04') return 'Apr';
+                        if (m === '07') return 'Jul';
+                        if (m === '10') return 'Oct';
+                        return '';
+                    };
+                } else if (totalMonths <= 65) {
+                    // 5Y: show Jan + Jul
+                    return function(val, idx) {
+                        const d = this.getLabelForValue(val);
+                        if (!d) return '';
+                        const [y, m] = d.split('-');
+                        if (m === '01') return y;
+                        if (m === '07') return 'Jul';
+                        return '';
+                    };
+                } else {
+                    // 10Y / ALL: show years only
+                    return function(val, idx) {
+                        const d = this.getLabelForValue(val);
+                        if (!d) return '';
+                        const [y, m] = d.split('-');
+                        if (m === '01') return y;
+                        return '';
+                    };
+                }
+            }
 
             mainChart = new Chart(ctx, {
                 type: 'line',
@@ -722,6 +800,7 @@
                         }
                     ]
                 },
+                plugins: [watermarkPlugin],
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
@@ -762,15 +841,9 @@
                             ticks: {
                                 color: '#555',
                                 font: { family: 'JetBrains Mono', size: 10 },
-                                maxTicksLimit: 12,
-                                callback: function(val, idx) {
-                                    const d = this.getLabelForValue(val);
-                                    if (!d) return '';
-                                    const [y, m] = d.split('-');
-                                    if (m === '01') return y;
-                                    if (m === '07') return '';
-                                    return '';
-                                }
+                                maxTicksLimit: totalMonths <= 40 ? 16 : 12,
+                                maxRotation: 0,
+                                callback: getTickCallback(totalMonths)
                             }
                         },
                         'y-btc': {
@@ -931,7 +1004,7 @@
         // ============================================================
         function initDashboard() {
             try { renderSummary(); } catch(e) { console.error('Summary error:', e); }
-            try { createMainChart(currentLead); } catch(e) { console.error('Chart error:', e); }
+            try { createMainChart(currentLead, currentPeriod); } catch(e) { console.error('Chart error:', e); }
             try { renderCorrelations(currentLead); } catch(e) { console.error('Correlation error:', e); }
             try { renderBreakdown(); } catch(e) { console.error('Breakdown error:', e); }
         }
@@ -942,8 +1015,18 @@
                 document.querySelectorAll('.lead-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 currentLead = parseInt(btn.dataset.lead);
-                createMainChart(currentLead);
+                createMainChart(currentLead, currentPeriod);
                 renderCorrelations(currentLead);
+            });
+        });
+
+        // Period selector
+        document.querySelectorAll('.period-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentPeriod = parseInt(btn.dataset.period);
+                createMainChart(currentLead, currentPeriod);
             });
         });
 
@@ -976,6 +1059,21 @@
         function shareTelegram() {
             const text = `${SHARE_TITLE} - ${SHARE_DESC}`;
             window.open(`https://t.me/share/url?url=${encodeURIComponent(SHARE_URL)}&text=${encodeURIComponent(text)}`, '_blank');
+        }
+
+        function shareInstagram() {
+            navigator.clipboard.writeText(SHARE_URL).then(() => {
+                const btn = document.querySelector('.instagram');
+                const orig = btn.innerHTML;
+                btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> 링크 복사됨! 스토리에 붙여넣기';
+                btn.style.borderColor = '#E4405F';
+                btn.style.color = '#E4405F';
+                setTimeout(() => {
+                    btn.innerHTML = orig;
+                    btn.style.borderColor = '';
+                    btn.style.color = '';
+                }, 2500);
+            });
         }
 
         function copyLink() {

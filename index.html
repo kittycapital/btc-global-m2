@@ -197,6 +197,7 @@
         .lead-selector {
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 8px;
             margin-bottom: 15px;
             flex-wrap: wrap;
@@ -458,8 +459,7 @@
             <h1>BTC vs Global M2 상관관계</h1>
             <p>비트코인 가격과 글로벌 통화량(M2)의 관계를 분석합니다</p>
             <div class="subtitle-flags">
-                <span>🇺🇸</span><span>🇪🇺</span><span>🇯🇵</span>
-                3개국 M2 합산 · 10주 선행 지표
+                US · EU · JP — 3개국 M2 합산 · 10주 선행 지표
             </div>
         </header>
 
@@ -489,15 +489,15 @@
 
         <!-- Main Chart -->
         <section class="chart-section">
-            <div class="section-header">
+            <div class="section-header" style="text-align:center; justify-content:center;">
                 <div>
                     <h2 class="section-title">BTC 가격 vs 글로벌 M2 (선행 지표)</h2>
                     <p class="section-desc">M2를 앞당겨 비트코인 가격과 비교합니다</p>
                 </div>
-                <div class="chart-legend">
-                    <div class="legend-item"><span class="legend-line btc"></span>BTC (로그)</div>
-                    <div class="legend-item"><span class="legend-line m2"></span>글로벌 M2</div>
-                </div>
+            </div>
+            <div class="chart-legend" style="justify-content:center; margin-bottom:10px;">
+                <div class="legend-item"><span class="legend-line btc"></span>BTC (로그)</div>
+                <div class="legend-item"><span class="legend-line m2"></span>글로벌 M2</div>
             </div>
             <div class="lead-selector">
                 <label>M2 선행:</label>
@@ -521,9 +521,9 @@
 
         <!-- Correlation Analysis -->
         <section class="corr-section">
-            <div class="section-header">
+            <div class="section-header" style="justify-content:center; text-align:center;">
                 <div>
-                    <h2 class="section-title">📊 상관관계 분석</h2>
+                    <h2 class="section-title">상관관계 분석</h2>
                     <p class="section-desc">Pearson 상관계수 · M2 <span id="corr-lead-label">10</span>주 선행 기준</p>
                 </div>
             </div>
@@ -534,9 +534,9 @@
 
         <!-- M2 Breakdown -->
         <section class="breakdown-section">
-            <div class="section-header">
+            <div class="section-header" style="justify-content:center; text-align:center;">
                 <div>
-                    <h2 class="section-title">🌍 국가별 M2 구성</h2>
+                    <h2 class="section-title">국가별 M2 구성</h2>
                     <p class="section-desc" id="breakdown-date">최신 데이터 기준</p>
                 </div>
             </div>
@@ -710,11 +710,13 @@
                 const { ctx, chartArea } = chart;
                 if (!chartArea) return;
                 ctx.save();
-                ctx.font = '12px JetBrains Mono';
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
-                ctx.textAlign = 'right';
-                ctx.textBaseline = 'bottom';
-                ctx.fillText('herdvibe.com', chartArea.right - 8, chartArea.bottom - 8);
+                ctx.font = '18px JetBrains Mono';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const centerX = (chartArea.left + chartArea.right) / 2;
+                const centerY = (chartArea.top + chartArea.bottom) / 2;
+                ctx.fillText('Herdvibe.com', centerX, centerY);
                 ctx.restore();
             }
         };
@@ -839,9 +841,9 @@
                         x: {
                             grid: { color: 'rgba(255,255,255,0.04)' },
                             ticks: {
-                                color: '#555',
+                                color: '#666',
                                 font: { family: 'JetBrains Mono', size: 10 },
-                                maxTicksLimit: totalMonths <= 40 ? 16 : 12,
+                                autoSkip: false,
                                 maxRotation: 0,
                                 callback: getTickCallback(totalMonths)
                             }
@@ -947,9 +949,9 @@
             const total = DATA.global_m2[latestDate];
 
             const countries = [
-                { key: 'us', flag: '🇺🇸', name: '미국', source: 'FRED' },
-                { key: 'eurozone', flag: '🇪🇺', name: '유로존', source: 'ECB' },
-                { key: 'japan', flag: '🇯🇵', name: '일본', source: 'BOJ' }
+                { key: 'us', label: 'US', name: '미국', source: 'FRED' },
+                { key: 'eurozone', label: 'EU', name: '유로존', source: 'ECB' },
+                { key: 'japan', label: 'JP', name: '일본', source: 'BOJ' }
             ];
 
             const grid = document.getElementById('breakdownGrid');
@@ -965,7 +967,7 @@
                 const item = document.createElement('div');
                 item.className = 'breakdown-item';
                 item.innerHTML = `
-                    <div class="breakdown-flag">${c.flag}</div>
+                    <div class="breakdown-flag">${c.label}</div>
                     <div class="breakdown-name">${c.name} (${c.source})</div>
                     <div class="breakdown-value">$${val.toFixed(1)}T</div>
                     <div class="breakdown-pct">${pct}%</div>

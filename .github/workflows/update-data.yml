@@ -1,0 +1,39 @@
+name: Update M2 & BTC Data
+
+on:
+  schedule:
+    # Run on 20th of each month at 09:00 UTC (18:00 KST)
+    # M2 data is typically released mid-month
+    - cron: '0 9 20 * *'
+  workflow_dispatch:  # Manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Fetch M2 and BTC data
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
+        run: |
+          python fetch_data.py
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/
+          git diff --cached --quiet || git commit -m "📊 Update M2 & BTC data $(date +'%Y-%m-%d')"
+          git push

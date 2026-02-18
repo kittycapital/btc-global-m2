@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-BTC vs Global M2 Data Fetcher
+BTC vs Global M2 Data Fetcher v3
 Collects M2 money supply data from 4 central banks and BTC price data.
 
 Sources:
   - US M2: FRED API (M2SL)
-  - Eurozone M2: ECB Data Portal API (BSI) - M.U2.Y.V.M20.X.1.U2.2300.Z01.E
+  - Eurozone M2: ECB Data Portal API (BSI.M.U2.Y.V.M20.X.1.U2.2300.Z01.E)
   - Japan M2: BOJ Main Time-series Statistics HTML table scrape
-  - Korea M2: ECOS API (한국은행) - 101Y002 / BBGA00
+  - Korea M2: ECOS API (한국은행) - auto-discovers correct stat/item codes
   - Exchange Rates: FRED API (EXJPUS, DEXUSEU, EXKOUS)
-  - BTC Price: data/BTC_USD.csv (provided externally)
+  - BTC Price: data/BTC_USD.csv
 """
 
 import os
@@ -33,10 +33,10 @@ OUTPUT_FILE = 'data/m2_btc_data.json'
 BTC_CSV = 'data/BTC_USD.csv'
 
 FRED_SERIES = {
-    'us_m2': 'M2SL',           # US M2 (Billions USD, Monthly SA)
-    'fx_jpyusd': 'EXJPUS',     # JPY per USD (Monthly)
-    'fx_usdeur': 'DEXUSEU',    # USD per EUR (Daily -> monthly avg)
-    'fx_krwusd': 'EXKOUS',     # KRW per USD (Monthly)
+    'us_m2': 'M2SL',
+    'fx_jpyusd': 'EXJPUS',
+    'fx_usdeur': 'DEXUSEU',
+    'fx_krwusd': 'EXKOUS',
 }
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (compatible; HerdvibBot/1.0)'}
@@ -46,7 +46,6 @@ HEADERS = {'User-Agent': 'Mozilla/5.0 (compatible; HerdvibBot/1.0)'}
 # FRED API
 # ============================================================
 def fetch_fred(series_id, start_date='2004-01-01'):
-    """Fetch data from FRED API."""
     params = urllib.parse.urlencode({
         'series_id': series_id,
         'api_key': FRED_API_KEY,
@@ -56,19 +55,16 @@ def fetch_fred(series_id, start_date='2004-01-01'):
         'aggregation_method': 'avg',
     })
     url = f'https://api.stlouisfed.org/fred/series/observations?{params}'
-
     try:
         req = urllib.request.Request(url, headers=HEADERS)
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode())
-
         result = {}
         for obs in data.get('observations', []):
             date = obs['date'][:7]
             val = obs['value']
             if val != '.' and val != '':
                 result[date] = float(val)
-
         print(f"  FRED {series_id}: {len(result)} observations")
         return result
     except Exception as e:
@@ -80,61 +76,13 @@ def fetch_fred(series_id, start_date='2004-01-01'):
 # ECB API (Eurozone M2)
 # ============================================================
 def fetch_ecb_m2():
-    """Fetch Eurozone M2 from ECB Data Portal API.
-
-    Correct series key: BSI.M.U2.Y.V.M20.X.1.U2.2300.Z01.E
-      - M = Monthly
-      - U2 = Euro area
-      - Y = Working day and seasonally adjusted
-      - V = MFIs, central government and post office
-      - M20 = Monetary aggregate M2
-      - X = All currencies combined
-      - 1 = Outstanding amounts at the end of the period
-      - U2 = Euro area (changing composition)
-      - 2300 = Non-MFIs excluding central government
-      - Z01 = All currencies combined
-      - E = Euro (unit)
-    """
+    """BSI.M.U2.Y.V.M20.X.1.U2.2300.Z01.E (SA, Outstanding, Millions EUR)"""
     key = 'M.U2.Y.V.M20.X.1.U2.2300.Z01.E'
     url = f'https://data-api.ecb.europa.eu/service/data/BSI/{key}?startPeriod=2004-01&format=csvdata'
-
-    print(f"  ECB URL: {url}")
-
     try:
         req = urllib.request.Request(url, headers=HEADERS)
         with urllib.request.urlopen(req, timeout=60) as resp:
             text = resp.read().decode()
-
-        result = {}
-        reader = csv.DictReader(text.splitlines())
-        for row in reader:
-            period = row.get('TIME_PERIOD', '')
-            value = row.get('OBS_VALUE', '')
-            if period and value:
-                result[period] = float(value)  # Millions EUR
-
-        print(f"  ECB M2: {len(result)} observations")
-        if result:
-            dates = sorted(result.keys())
-            print(f"  ECB range: {dates[0]} to {dates[-1]}")
-            print(f"  ECB latest: {result[dates[-1]]:,.0f} millions EUR")
-        return result
-    except Exception as e:
-        print(f"  ECB M2 ERROR: {e}")
-        return fetch_ecb_m2_fallback()
-
-
-def fetch_ecb_m2_fallback():
-    """Fallback: try non-seasonally adjusted M2."""
-    key = 'M.U2.N.V.M20.X.1.U2.2300.Z01.E'
-    url = f'https://data-api.ecb.europa.eu/service/data/BSI/{key}?startPeriod=2004-01&format=csvdata'
-    print(f"  ECB fallback URL: {url}")
-
-    try:
-        req = urllib.request.Request(url, headers=HEADERS)
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            text = resp.read().decode()
-
         result = {}
         reader = csv.DictReader(text.splitlines())
         for row in reader:
@@ -142,20 +90,37 @@ def fetch_ecb_m2_fallback():
             value = row.get('OBS_VALUE', '')
             if period and value:
                 result[period] = float(value)
-
-        print(f"  ECB M2 (fallback NSA): {len(result)} observations")
+        print(f"  ECB M2: {len(result)} observations")
+        if result:
+            dates = sorted(result.keys())
+            print(f"  ECB range: {dates[0]} to {dates[-1]}")
         return result
     except Exception as e:
-        print(f"  ECB M2 fallback ERROR: {e}")
-        return {}
+        print(f"  ECB M2 ERROR: {e}")
+        # Fallback: non-seasonally adjusted
+        try:
+            key2 = 'M.U2.N.V.M20.X.1.U2.2300.Z01.E'
+            url2 = f'https://data-api.ecb.europa.eu/service/data/BSI/{key2}?startPeriod=2004-01&format=csvdata'
+            req2 = urllib.request.Request(url2, headers=HEADERS)
+            with urllib.request.urlopen(req2, timeout=60) as resp2:
+                text2 = resp2.read().decode()
+            result2 = {}
+            for row in csv.DictReader(text2.splitlines()):
+                p = row.get('TIME_PERIOD', '')
+                v = row.get('OBS_VALUE', '')
+                if p and v:
+                    result2[p] = float(v)
+            print(f"  ECB M2 (NSA fallback): {len(result2)} observations")
+            return result2
+        except Exception as e2:
+            print(f"  ECB M2 fallback ERROR: {e2}")
+            return {}
 
 
 # ============================================================
 # BOJ (Japan M2) - HTML Table Scrape
 # ============================================================
 class BOJTableParser(HTMLParser):
-    """Parse the BOJ main time-series statistics HTML table."""
-
     def __init__(self):
         super().__init__()
         self.in_table = False
@@ -192,56 +157,33 @@ class BOJTableParser(HTMLParser):
 
 
 def fetch_boj_m2():
-    """Fetch Japan M2 from BOJ Main Time-series Statistics HTML table.
-
-    Page: https://www.stat-search.boj.or.jp/ssi/mtshtml/md02_m_1_en.html
-    Table columns (0-indexed):
-      0: Date (YYYY/MM)
-      1-8: Percent changes (M2, M3, M1, L, CC, DM, QM, CD)
-      9-16: Average Amounts Outstanding (M2, M3, M1, L, CC, DM, QM, CD)
-
-    We want column 9: M2 Average Amounts Outstanding (100 million yen)
-    Data starts from 2003/04.
-    """
+    """Scrape BOJ md02_m_1_en.html, column 9 = M2 Average Outstanding (億円)"""
     url = 'https://www.stat-search.boj.or.jp/ssi/mtshtml/md02_m_1_en.html'
-    print(f"  BOJ URL: {url}")
-
     try:
         req = urllib.request.Request(url, headers=HEADERS)
         with urllib.request.urlopen(req, timeout=60) as resp:
             text = resp.read().decode('utf-8', errors='replace')
-
         parser = BOJTableParser()
         parser.feed(text)
-
         result = {}
-        m2_col_idx = 9  # M2 Average Amounts Outstanding
-
+        m2_col = 9
         for row in parser.rows:
-            if len(row) <= m2_col_idx:
+            if len(row) <= m2_col:
                 continue
-
-            date_str = row[0].strip()
-            match = re.match(r'^(\d{4})/(\d{2})$', date_str)
+            match = re.match(r'^(\d{4})/(\d{2})$', row[0].strip())
             if not match:
                 continue
-
-            year, month = match.groups()
-            value_str = row[m2_col_idx].strip().replace(',', '')
-
-            if value_str and value_str != 'ND' and value_str != '':
+            y, m = match.groups()
+            val = row[m2_col].strip().replace(',', '')
+            if val and val != 'ND':
                 try:
-                    value = float(value_str)
-                    date_key = f"{year}-{month}"
-                    result[date_key] = value  # 100 million yen (億円)
+                    result[f"{y}-{m}"] = float(val)
                 except ValueError:
-                    continue
-
+                    pass
         print(f"  BOJ M2: {len(result)} observations")
         if result:
             dates = sorted(result.keys())
             print(f"  BOJ range: {dates[0]} to {dates[-1]}")
-            print(f"  BOJ latest: {result[dates[-1]]:,.0f} (100M JPY)")
         return result
     except Exception as e:
         print(f"  BOJ M2 ERROR: {e}")
@@ -249,130 +191,157 @@ def fetch_boj_m2():
 
 
 # ============================================================
-# ECOS API (Korea M2)
+# ECOS API (Korea M2) - Auto-discover correct item codes
 # ============================================================
-def fetch_ecos_m2():
-    """Fetch Korea M2 from Bank of Korea ECOS API.
+def ecos_api_call(path):
+    """Make ECOS API call and return parsed JSON."""
+    url = f'https://ecos.bok.or.kr/api/{path}'
+    req = urllib.request.Request(url, headers=HEADERS)
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read().decode())
 
-    After 2022-05 API restructuring:
-      통계표코드: 101Y002 (통화 및 유동성)
-      항목코드: BBGA00 (M2 평잔)
-      주기: M (월간)
+
+def ecos_discover_m2_items(stat_code):
+    """Use StatisticItemList to find available item codes for a stat table."""
+    path = f'StatisticItemList/{ECOS_API_KEY}/json/kr/1/500/{stat_code}'
+    try:
+        data = ecos_api_call(path)
+        if 'StatisticItemList' not in data:
+            return []
+        items = data['StatisticItemList'].get('row', [])
+        return items
+    except Exception as e:
+        print(f"    ItemList error for {stat_code}: {e}")
+        return []
+
+
+def ecos_search(stat_code, item_code, cycle='M', start='200401', end='202612'):
+    """Fetch data from ECOS StatisticSearch."""
+    path = (
+        f'StatisticSearch/{ECOS_API_KEY}/json/kr/1/1000/'
+        f'{stat_code}/{cycle}/{start}/{end}/{item_code}'
+    )
+    data = ecos_api_call(path)
+    if 'StatisticSearch' not in data:
+        return {}
+    result = {}
+    for row in data['StatisticSearch'].get('row', []):
+        time = row.get('TIME', '')
+        val = row.get('DATA_VALUE', '').replace(',', '')
+        if time and val:
+            try:
+                result[f"{time[:4]}-{time[4:6]}"] = float(val)
+            except ValueError:
+                pass
+    return result
+
+
+def fetch_ecos_m2():
+    """Auto-discover and fetch Korea M2 data.
+
+    Strategy:
+    1. Query StatisticItemList for stat tables likely to contain M2
+    2. Find items containing 'M2' or '광의통화' in name, with '평잔' (average)
+    3. Query data and pick the one with the most observations
     """
     if not ECOS_API_KEY:
         print("  ECOS: No API key set, skipping")
         return {}
 
-    stat_code = '101Y002'
-    item_code = 'BBGA00'
-    start = '200401'
-    end = '202612'
+    # Stat codes that may contain M2 data
+    stat_codes = ['101Y002', '101Y003', '101Y017']
 
-    url = (
-        f'https://ecos.bok.or.kr/api/StatisticSearch/'
-        f'{ECOS_API_KEY}/json/kr/1/1000/'
-        f'{stat_code}/M/{start}/{end}/{item_code}'
-    )
+    best_result = {}
+    best_info = ''
 
-    print(f"  ECOS URL: .../{stat_code}/M/{start}/{end}/{item_code}")
+    for stat_code in stat_codes:
+        print(f"  ECOS: Discovering items for {stat_code}...")
+        items = ecos_discover_m2_items(stat_code)
 
-    try:
-        req = urllib.request.Request(url, headers=HEADERS)
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            raw = resp.read().decode()
-            data = json.loads(raw)
+        if not items:
+            print(f"    No items found for {stat_code}")
+            continue
 
-        if 'StatisticSearch' not in data:
-            print(f"  ECOS response keys: {list(data.keys())}")
-            if 'RESULT' in data:
-                print(f"  ECOS error: {data['RESULT']}")
-            return fetch_ecos_m2_fallback()
+        # Filter for M2-related items
+        m2_items = []
+        for item in items:
+            name = item.get('ITEM_NAME', '')
+            code = item.get('ITEM_CODE', '')
+            cycle = item.get('CYCLE', '')
 
-        result = {}
-        rows = data.get('StatisticSearch', {}).get('row', [])
-        for row in rows:
-            time = row.get('TIME', '')
-            val = row.get('DATA_VALUE', '')
-            if time and val:
-                date_key = f"{time[:4]}-{time[4:6]}"
-                val_clean = val.replace(',', '')
-                try:
-                    result[date_key] = float(val_clean)  # 억원
-                except ValueError:
-                    continue
+            # Look for M2 평잔 (average outstanding) in monthly data
+            is_m2 = ('M2' in name or '광의통화' in name)
+            is_avg = ('평잔' in name or 'Average' in name or 'average' in name)
+            # Also accept items that just say M2 without 평잔
+            if is_m2:
+                m2_items.append({
+                    'code': code,
+                    'name': name,
+                    'cycle': cycle,
+                    'is_avg': is_avg
+                })
 
-        print(f"  ECOS M2: {len(result)} observations")
-        if result:
-            dates = sorted(result.keys())
-            print(f"  ECOS range: {dates[0]} to {dates[-1]}")
-            print(f"  ECOS latest: {result[dates[-1]]:,.0f} (억원)")
-        else:
-            # 0 results, try fallback
-            print("  ECOS: 0 results, trying fallback codes...")
-            return fetch_ecos_m2_fallback()
+        if not m2_items:
+            # If no M2 items found, print all items for debugging
+            print(f"    No M2 items found. Available items:")
+            for item in items[:20]:
+                print(f"      {item.get('ITEM_CODE', '?')}: {item.get('ITEM_NAME', '?')}")
+            continue
 
-        return result
-    except Exception as e:
-        print(f"  ECOS M2 ERROR: {e}")
-        return fetch_ecos_m2_fallback()
+        # Sort: prefer 평잔 items
+        m2_items.sort(key=lambda x: (not x['is_avg'], x['code']))
 
+        print(f"    Found {len(m2_items)} M2-related items:")
+        for item in m2_items[:5]:
+            print(f"      {item['code']}: {item['name']}")
 
-def fetch_ecos_m2_fallback():
-    """Try alternative ECOS stat/item codes for M2."""
-    alt_codes = [
-        ('101Y003', 'BBGA00'),   # M2 구성내역
-        ('101Y002', 'BBHS01'),   # Alternative item code
-        ('101Y002', 'BBGA00A'),  # Another variant
-    ]
+        # Try each M2 item and pick the one with most data
+        for item in m2_items:
+            try:
+                result = ecos_search(stat_code, item['code'])
+                count = len(result)
+                print(f"    {stat_code}/{item['code']}: {count} observations")
 
-    for stat_code, item_code in alt_codes:
-        url = (
-            f'https://ecos.bok.or.kr/api/StatisticSearch/'
-            f'{ECOS_API_KEY}/json/kr/1/1000/'
-            f'{stat_code}/M/200401/202612/{item_code}'
-        )
-        print(f"  ECOS trying: {stat_code}/{item_code}")
+                if count > len(best_result):
+                    best_result = result
+                    best_info = f"{stat_code}/{item['code']} ({item['name']})"
 
-        try:
-            req = urllib.request.Request(url, headers=HEADERS)
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                data = json.loads(resp.read().decode())
+                if count > 200:
+                    break  # Good enough
+            except Exception as e:
+                print(f"    {stat_code}/{item['code']}: ERROR {e}")
 
-            if 'StatisticSearch' in data:
-                rows = data['StatisticSearch'].get('row', [])
-                if rows:
-                    result = {}
-                    for row in rows:
-                        time = row.get('TIME', '')
-                        val = row.get('DATA_VALUE', '').replace(',', '')
-                        if time and val:
-                            try:
-                                date_key = f"{time[:4]}-{time[4:6]}"
-                                result[date_key] = float(val)
-                            except ValueError:
-                                continue
-                    if result:
-                        print(f"  ECOS fallback OK ({stat_code}/{item_code}): {len(result)} obs")
-                        return result
-            else:
-                err = data.get('RESULT', {})
-                print(f"  ECOS {stat_code}/{item_code}: {err.get('MESSAGE', 'error')}")
-        except Exception as e:
-            print(f"  ECOS {stat_code}/{item_code}: {e}")
+        if len(best_result) > 200:
+            break
 
-    print("  ECOS: All attempts failed")
-    return {}
+    if best_result:
+        dates = sorted(best_result.keys())
+        print(f"  ECOS M2: {len(best_result)} observations via {best_info}")
+        print(f"  ECOS range: {dates[0]} to {dates[-1]}")
+        print(f"  ECOS latest: {best_result[dates[-1]]:,.0f} (억원)")
+    else:
+        print("  ECOS M2: No data found after all attempts")
+        # Last resort: try direct known codes
+        for sc, ic in [('101Y002', 'BBHS01'), ('101Y003', 'BBGA00'),
+                        ('101Y002', 'BBGA00A'), ('101Y002', 'BBIA00')]:
+            try:
+                result = ecos_search(sc, ic)
+                if len(result) > len(best_result):
+                    best_result = result
+                    print(f"    Last resort {sc}/{ic}: {len(result)} observations")
+            except:
+                pass
+
+    return best_result
 
 
 # ============================================================
 # BTC PRICE (from CSV)
 # ============================================================
 def load_btc_csv():
-    """Load BTC price from CSV and compute monthly averages."""
     if not os.path.exists(BTC_CSV):
         print(f"  BTC CSV not found: {BTC_CSV}")
         return {}
-
     monthly = defaultdict(list)
     with open(BTC_CSV, 'r') as f:
         reader = csv.DictReader(f)
@@ -381,15 +350,12 @@ def load_btc_csv():
             close = row.get('Close', '')
             if date and close:
                 try:
-                    ym = date[:7]
-                    monthly[ym].append(float(close))
+                    monthly[date[:7]].append(float(close))
                 except ValueError:
-                    continue
-
+                    pass
     result = {}
     for ym, prices in sorted(monthly.items()):
         result[ym] = round(sum(prices) / len(prices), 2)
-
     print(f"  BTC CSV: {len(result)} months")
     return result
 
@@ -398,38 +364,26 @@ def load_btc_csv():
 # DATA ASSEMBLY
 # ============================================================
 def convert_to_usd_trillions(m2_local, fx_rates, country):
-    """Convert local currency M2 to USD trillions."""
     result = {}
-
     for date, local_val in m2_local.items():
         if country == 'eurozone':
-            # ECB: Millions EUR → Trillions USD
             usdeur = fx_rates.get('fx_usdeur', {}).get(date)
             if usdeur:
-                usd_val = (local_val * 1e6 * usdeur) / 1e12
-                result[date] = round(usd_val, 2)
-
+                result[date] = round((local_val * 1e6 * usdeur) / 1e12, 2)
         elif country == 'japan':
-            # BOJ: 億円 (100 million JPY) → Trillions USD
             jpyusd = fx_rates.get('fx_jpyusd', {}).get(date)
             if jpyusd and jpyusd > 0:
-                usd_val = (local_val * 1e8 / jpyusd) / 1e12
-                result[date] = round(usd_val, 2)
-
+                result[date] = round((local_val * 1e8 / jpyusd) / 1e12, 2)
         elif country == 'korea':
-            # ECOS: 억원 (100 million KRW) → Trillions USD
             krwusd = fx_rates.get('fx_krwusd', {}).get(date)
             if krwusd and krwusd > 0:
-                usd_val = (local_val * 1e8 / krwusd) / 1e12
-                result[date] = round(usd_val, 2)
-
+                result[date] = round((local_val * 1e8 / krwusd) / 1e12, 2)
     return result
 
 
 def assemble_data():
-    """Fetch all data and assemble into final JSON."""
     print("=" * 60)
-    print(f"BTC vs Global M2 Data Fetch - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    print(f"BTC vs Global M2 Data Fetch v3 - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     print("=" * 60)
 
     print("\n[1/6] Fetching US M2 from FRED...")
@@ -453,12 +407,9 @@ def assemble_data():
     print("\n[6/6] Loading BTC price data...")
     btc_monthly = load_btc_csv()
 
-    # ---- Convert ----
+    # Convert
     print("\n[Converting currencies...]")
-
-    us_m2 = {}
-    for date, val in us_m2_raw.items():
-        us_m2[date] = round(val / 1000, 2)  # Billions → Trillions
+    us_m2 = {d: round(v / 1000, 2) for d, v in us_m2_raw.items()}
     print(f"  US M2: {len(us_m2)} months in USD trillions")
 
     eu_m2 = convert_to_usd_trillions(eu_m2_raw, fx_rates, 'eurozone')
@@ -470,7 +421,7 @@ def assemble_data():
     kr_m2 = convert_to_usd_trillions(kr_m2_raw, fx_rates, 'korea')
     print(f"  KR M2: {len(kr_m2)} months in USD trillions")
 
-    # ---- Global M2 ----
+    # Global M2
     print("\n[Computing Global M2...]")
     all_dates = sorted(
         set(us_m2.keys()) | set(eu_m2.keys()) |
@@ -485,11 +436,9 @@ def assemble_data():
         eu = eu_m2.get(date)
         jp = jp_m2.get(date)
         kr = kr_m2.get(date)
-
         available = [v for v in [us, eu, jp, kr] if v is not None]
         if us is not None and len(available) >= 2:
-            total = sum(available)
-            global_m2[date] = round(total, 2)
+            global_m2[date] = round(sum(available), 2)
             if us: m2_components['us'][date] = us
             if eu: m2_components['eurozone'][date] = eu
             if jp: m2_components['japan'][date] = jp
@@ -497,11 +446,11 @@ def assemble_data():
 
     print(f"  Global M2: {len(global_m2)} months")
     if global_m2:
-        dates_sorted = sorted(global_m2.keys())
-        print(f"  Range: {dates_sorted[0]} to {dates_sorted[-1]}")
-        print(f"  Latest: ${global_m2[dates_sorted[-1]]}T")
+        ds = sorted(global_m2.keys())
+        print(f"  Range: {ds[0]} to {ds[-1]}")
+        print(f"  Latest: ${global_m2[ds[-1]]}T")
 
-    # ---- Output ----
+    # Output
     output = {
         'last_updated': datetime.now().strftime('%Y-%m-%d'),
         'btc_monthly_avg': btc_monthly,
@@ -525,18 +474,17 @@ def assemble_data():
     print(f"✅ Saved to {OUTPUT_FILE}")
     print(f"   File size: {os.path.getsize(OUTPUT_FILE):,} bytes")
     print(f"\n📊 Data Summary:")
-    print(f"   US M2:    {'✅' if len(us_m2) > 100 else '⚠️ '}  {len(us_m2)} months")
-    print(f"   EU M2:    {'✅' if len(eu_m2) > 100 else '⚠️ '}  {len(eu_m2)} months")
-    print(f"   JP M2:    {'✅' if len(jp_m2) > 100 else '⚠️ '}  {len(jp_m2)} months")
-    print(f"   KR M2:    {'✅' if len(kr_m2) > 100 else '⚠️ '}  {len(kr_m2)} months")
-    print(f"   BTC:      {'✅' if len(btc_monthly) > 100 else '⚠️ '}  {len(btc_monthly)} months")
-    print(f"   Global:   {'✅' if len(global_m2) > 100 else '⚠️ '}  {len(global_m2)} months")
+    for name, count in [
+        ('US M2', len(us_m2)), ('EU M2', len(eu_m2)),
+        ('JP M2', len(jp_m2)), ('KR M2', len(kr_m2)),
+        ('BTC', len(btc_monthly)), ('Global', len(global_m2))
+    ]:
+        icon = '✅' if count > 100 else '⚠️ '
+        print(f"   {name:10s} {icon}  {count} months")
 
 
 if __name__ == '__main__':
     if not FRED_API_KEY:
         print("⚠️  FRED_API_KEY not set.")
-        print("   export FRED_API_KEY=your_key_here")
         sys.exit(1)
-
     assemble_data()

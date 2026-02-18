@@ -9,7 +9,7 @@
     <meta property="og:description" content="비트코인과 글로벌 M2 통화량의 상관관계 분석 대시보드">
     <meta property="og:type" content="website">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
+    <!-- annotation plugin removed -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -294,7 +294,7 @@
 
         .breakdown-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 10px;
             margin-top: 15px;
         }
@@ -450,8 +450,8 @@
             <h1>BTC vs Global M2 상관관계</h1>
             <p>비트코인 가격과 글로벌 통화량(M2)의 관계를 분석합니다</p>
             <div class="subtitle-flags">
-                <span>🇺🇸</span><span>🇪🇺</span><span>🇯🇵</span><span>🇰🇷</span>
-                4개국 M2 합산 · 10주 선행 지표
+                <span>🇺🇸</span><span>🇪🇺</span><span>🇯🇵</span>
+                3개국 M2 합산 · 10주 선행 지표
             </div>
         </header>
 
@@ -553,7 +553,7 @@
 
         <!-- Footer -->
         <footer class="footer">
-            데이터: FRED (미국 M2) · ECB (유로존 M2) · BOJ (일본 M2) · 한국은행 ECOS (한국 M2)<br>
+            데이터: FRED (미국 M2) · ECB (유로존 M2) · BOJ (일본 M2)<br>
             환율: FRED (월평균) · BTC: 일간 종가 월평균<br>
             매월 자동 업데이트 · <a href="https://herdvibe.com" target="_blank">herdvibe.com</a>
         </footer>
@@ -876,8 +876,7 @@
             const countries = [
                 { key: 'us', flag: '🇺🇸', name: '미국', source: 'FRED' },
                 { key: 'eurozone', flag: '🇪🇺', name: '유로존', source: 'ECB' },
-                { key: 'japan', flag: '🇯🇵', name: '일본', source: 'BOJ' },
-                { key: 'korea', flag: '🇰🇷', name: '한국', source: 'ECOS' }
+                { key: 'japan', flag: '🇯🇵', name: '일본', source: 'BOJ' }
             ];
 
             const grid = document.getElementById('breakdownGrid');
@@ -887,8 +886,8 @@
             document.getElementById('breakdown-date').textContent = `${y}년 ${parseInt(m)}월 기준`;
 
             countries.forEach(c => {
-                const val = comp[c.key][latestDate];
-                const pct = ((val / total) * 100).toFixed(1);
+                const val = (comp[c.key] && comp[c.key][latestDate]) ? comp[c.key][latestDate] : 0;
+                const pct = total > 0 ? ((val / total) * 100).toFixed(1) : '0.0';
 
                 const item = document.createElement('div');
                 item.className = 'breakdown-item';
@@ -931,10 +930,10 @@
         // INIT
         // ============================================================
         function initDashboard() {
-            renderSummary();
-            createMainChart(currentLead);
-            renderCorrelations(currentLead);
-            renderBreakdown();
+            try { renderSummary(); } catch(e) { console.error('Summary error:', e); }
+            try { createMainChart(currentLead); } catch(e) { console.error('Chart error:', e); }
+            try { renderCorrelations(currentLead); } catch(e) { console.error('Correlation error:', e); }
+            try { renderBreakdown(); } catch(e) { console.error('Breakdown error:', e); }
         }
 
         // Lead selector

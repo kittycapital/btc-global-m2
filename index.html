@@ -326,29 +326,28 @@
         // ============================================================
         // CLIPBOARD HELPER (iframe/HTTP fallback)
         // ============================================================
-        function copyToClipboard(text) {
-            if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
-                return navigator.clipboard.writeText(text);
+        async function copyToClipboard(text) {
+            // 1) Clipboard API (iframe needs allow="clipboard-write")
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                try { await navigator.clipboard.writeText(text); return true; } catch(e) {}
             }
-            return new Promise((resolve, reject) => {
+            // 2) execCommand fallback
+            try {
                 const ta = document.createElement('textarea');
                 ta.value = text;
-                ta.style.position = 'fixed';
-                ta.style.left = '-9999px';
-                ta.style.top = '-9999px';
-                ta.style.opacity = '0';
+                ta.setAttribute('readonly', '');
+                Object.assign(ta.style, { position:'fixed', left:'-9999px', top:'-9999px', opacity:'0' });
                 document.body.appendChild(ta);
-                ta.focus();
-                ta.select();
-                try {
-                    const ok = document.execCommand('copy');
-                    document.body.removeChild(ta);
-                    ok ? resolve() : reject(new Error('execCommand failed'));
-                } catch (e) {
-                    document.body.removeChild(ta);
-                    reject(e);
-                }
-            });
+                ta.focus(); ta.select();
+                // iOS 대응
+                ta.setSelectionRange(0, ta.value.length);
+                const ok = document.execCommand('copy');
+                document.body.removeChild(ta);
+                if (ok) return true;
+            } catch(e) {}
+            // 3) 최후 fallback — 새 탭으로 열기
+            window.open(text, '_blank');
+            return false;
         }
 
         // ============================================================
@@ -681,24 +680,30 @@
             window.open(`https://t.me/share/url?url=${encodeURIComponent(SHARE_URL)}&text=${encodeURIComponent(SHARE_TITLE + ' - ' + SHARE_DESC)}`, '_blank');
         }
 
-        function showCopied(btn) {
+        function showCopied(btn, success) {
             const orig = btn.innerHTML;
             const origBorder = btn.style.borderColor;
             const origColor = btn.style.color;
-            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> 복사됨!';
-            btn.style.borderColor = 'var(--accent-green)';
-            btn.style.color = 'var(--accent-green)';
+            if (success) {
+                btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> 복사됨!';
+                btn.style.borderColor = 'var(--accent-green)';
+                btn.style.color = 'var(--accent-green)';
+            } else {
+                btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg> 새 탭에서 열림';
+                btn.style.borderColor = 'var(--accent-yellow)';
+                btn.style.color = 'var(--accent-yellow)';
+            }
             setTimeout(() => { btn.innerHTML = orig; btn.style.borderColor = origBorder; btn.style.color = origColor; }, 2000);
         }
 
-        function shareInstagram() {
-            copyToClipboard(SHARE_URL);
-            showCopied(document.querySelector('.instagram'));
+        async function shareInstagram() {
+            const ok = await copyToClipboard(SHARE_URL);
+            showCopied(document.querySelector('.instagram'), ok);
         }
 
-        function copyLink() {
-            copyToClipboard(SHARE_URL);
-            showCopied(document.querySelector('.copy-link'));
+        async function copyLink() {
+            const ok = await copyToClipboard(SHARE_URL);
+            showCopied(document.querySelector('.copy-link'), ok);
         }
 
         document.addEventListener('DOMContentLoaded', loadData);

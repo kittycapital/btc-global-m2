@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcoin & Liquidity | BTC vs Global M2 YoY</title>
+    <meta name="description" content="비트코인 가격과 글로벌 M2 통화량 YoY 변화율을 비교 분석합니다. 유동성 확장/수축 구간과 BTC 가격 흐름의 관계.">
+    <meta property="og:title" content="Bitcoin & Liquidity | Herdvibe">
+    <meta property="og:description" content="비트코인과 글로벌 M2 YoY 변화율 비교 대시보드">
+    <meta property="og:type" content="website">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        ::-webkit-scrollbar { display: none; }
+        * { -ms-overflow-style: none; scrollbar-width: none; }
+
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #111111;
+            --bg-tertiary: #1a1a1a;
+            --text-primary: #ffffff;
+            --text-secondary: #888888;
+            --text-muted: #555555;
+            --accent-green: #00d4aa;
+            --accent-red: #ff4757;
+            --accent-yellow: #ffd43b;
+            --accent-blue: #4dabf7;
+            --accent-purple: #b197fc;
+            --border-color: #2a2a2a;
+            --btc-color: #f7931a;
+            --m2-color: #4dabf7;
+            --zone-green: rgba(0, 212, 170, 0.06);
+            --zone-red: rgba(255, 71, 87, 0.06);
+        }
+
+        html, body { overflow-x: hidden; }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+        .header {
+            text-align: center; padding: 30px 0 20px;
+            border-bottom: 1px solid var(--border-color); margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: 1.8rem; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 6px;
+            background: linear-gradient(135deg, #fff 0%, #888 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .header p { color: var(--text-secondary); font-size: 0.85rem; }
+        .header .subtitle-flags {
+            display: inline-flex; align-items: center; gap: 6px;
+            margin-top: 8px; font-size: 0.8rem; color: var(--text-muted);
+        }
+
+        /* Summary Cards */
+        .summary-cards {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px; margin-bottom: 20px;
+        }
+        .summary-card {
+            background: var(--bg-secondary); border: 1px solid var(--border-color);
+            border-radius: 10px; padding: 16px; text-align: center;
+        }
+        .summary-card .card-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+        .summary-card .card-value { font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; font-weight: 600; }
+        .summary-card .card-sub { font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px; }
+        .card-value.positive { color: var(--accent-green); }
+        .card-value.negative { color: var(--accent-red); }
+        .card-value.btc-orange { color: var(--btc-color); }
+        .card-value.m2-blue { color: var(--m2-color); }
+
+        /* Chart Section */
+        .chart-section {
+            background: var(--bg-secondary); border: 1px solid var(--border-color);
+            border-radius: 12px; padding: 20px; margin-bottom: 20px; position: relative;
+        }
+        .section-header {
+            display: flex; justify-content: center; align-items: flex-start;
+            margin-bottom: 15px; text-align: center;
+        }
+        .section-title { font-size: 1.1rem; font-weight: 600; }
+        .section-desc { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+
+        .chart-legend { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; margin-bottom: 10px; }
+        .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--text-secondary); }
+        .legend-line { width: 20px; height: 3px; border-radius: 2px; }
+        .legend-line.btc { background: var(--btc-color); }
+        .legend-line.m2 { background: var(--m2-color); }
+        .legend-box { width: 14px; height: 10px; border-radius: 2px; }
+        .legend-box.green-zone { background: rgba(0, 212, 170, 0.25); }
+        .legend-box.red-zone { background: rgba(255, 71, 87, 0.25); }
+
+        .period-selector {
+            display: flex; align-items: center; justify-content: center;
+            gap: 8px; margin-bottom: 15px; flex-wrap: wrap;
+        }
+        .period-selector label { font-size: 0.75rem; color: var(--text-secondary); }
+        .period-btn {
+            font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; padding: 5px 10px;
+            background: var(--bg-tertiary); border: 1px solid var(--border-color);
+            border-radius: 6px; color: var(--text-secondary); cursor: pointer; transition: all 0.2s;
+        }
+        .period-btn:hover { border-color: #3a3a3a; }
+        .period-btn.active { border-color: var(--btc-color); color: var(--btc-color); background: rgba(247, 147, 26, 0.1); }
+
+        .btc-chart-container { position: relative; height: 400px; width: 100%; }
+        .m2-chart-container { position: relative; height: 180px; width: 100%; margin-top: 5px; }
+
+        .chart-divider {
+            height: 1px; background: var(--border-color); margin: 8px 0;
+        }
+
+        /* Share Bar */
+        .share-bar { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+        .share-btn {
+            display: flex; align-items: center; gap: 6px; padding: 8px 16px;
+            border-radius: 8px; border: 1px solid var(--border-color);
+            background: var(--bg-secondary); color: var(--text-secondary);
+            font-size: 0.75rem; font-family: 'Noto Sans KR', sans-serif;
+            cursor: pointer; transition: all 0.2s; text-decoration: none;
+        }
+        .share-btn:hover { background: var(--bg-tertiary); border-color: #3a3a3a; color: var(--text-primary); }
+        .share-btn svg { width: 16px; height: 16px; }
+        .share-btn.twitter:hover { border-color: #1da1f2; color: #1da1f2; }
+        .share-btn.kakao:hover { border-color: #fee500; color: #fee500; }
+        .share-btn.telegram:hover { border-color: #26a5e4; color: #26a5e4; }
+        .share-btn.instagram:hover { border-color: #E4405F; color: #E4405F; }
+        .share-btn.copy-link:hover { border-color: var(--accent-green); color: var(--accent-green); }
+
+        /* Data info */
+        .data-info {
+            text-align: center; padding: 10px; margin-bottom: 10px;
+            font-size: 0.7rem; color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Footer */
+        .footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.7rem; line-height: 1.8; }
+        .footer a { color: var(--text-secondary); text-decoration: none; }
+        .footer a:hover { color: var(--text-primary); }
+
+        /* Loading */
+        .loading-overlay { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 400px; color: var(--text-muted); gap: 12px; }
+        .spinner { width: 30px; height: 30px; border: 3px solid var(--border-color); border-top-color: var(--btc-color); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 768px) {
+            .container { padding: 12px; }
+            .header { padding: 20px 0 15px; }
+            .header h1 { font-size: 1.3rem; }
+            .summary-cards { grid-template-columns: repeat(2, 1fr); }
+            .btc-chart-container { height: 300px; }
+            .m2-chart-container { height: 140px; }
+            .share-bar { flex-wrap: wrap; }
+            .share-btn { padding: 7px 12px; font-size: 0.7rem; }
+        }
+        @media (max-width: 480px) {
+            .container { padding: 10px; }
+            .header h1 { font-size: 1.1rem; }
+            .btc-chart-container { height: 250px; }
+            .m2-chart-container { height: 120px; }
+            .summary-cards { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+            .summary-card { padding: 12px; }
+            .summary-card .card-value { font-size: 1.1rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Bitcoin & Liquidity</h1>
+            <p>비트코인 가격과 글로벌 M2 유동성(YoY) 변화율을 비교합니다</p>
+            <div class="subtitle-flags">
+                US · EU · JP — 3개국 M2 합산 · 주간 BTC 가격
+            </div>
+        </header>
+
+        <div class="summary-cards">
+            <div class="summary-card">
+                <div class="card-label">BTC 최근 주간 평균</div>
+                <div class="card-value btc-orange" id="card-btc-price">-</div>
+                <div class="card-sub" id="card-btc-date">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="card-label">글로벌 M2</div>
+                <div class="card-value m2-blue" id="card-m2-total">-</div>
+                <div class="card-sub" id="card-m2-date">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="card-label">M2 YoY 변화율</div>
+                <div class="card-value" id="card-m2-yoy">-</div>
+                <div class="card-sub">최신 월 기준</div>
+            </div>
+            <div class="summary-card">
+                <div class="card-label">유동성 상태</div>
+                <div class="card-value" id="card-liquidity-state">-</div>
+                <div class="card-sub" id="card-liquidity-desc">-</div>
+            </div>
+        </div>
+
+        <section class="chart-section">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">BTC 가격 & 유동성 구간</h2>
+                    <p class="section-desc">배경색: M2 YoY 양수(초록) / 음수(빨강) 구간</p>
+                </div>
+            </div>
+            <div class="chart-legend">
+                <div class="legend-item"><span class="legend-line btc"></span>BTC 주간 평균 (로그)</div>
+                <div class="legend-item"><span class="legend-box green-zone"></span>M2 YoY &gt; 0 (확장)</div>
+                <div class="legend-item"><span class="legend-box red-zone"></span>M2 YoY &lt; 0 (수축)</div>
+            </div>
+            <div class="period-selector">
+                <label>기간:</label>
+                <button class="period-btn" data-months="36">3Y</button>
+                <button class="period-btn active" data-months="60">5Y</button>
+                <button class="period-btn" data-months="120">10Y</button>
+                <button class="period-btn" data-months="0">ALL</button>
+            </div>
+
+            <div class="btc-chart-container" id="btcChartWrap">
+                <canvas id="btcChart"></canvas>
+            </div>
+
+            <div class="chart-divider"></div>
+
+            <div class="section-header" style="margin-top: 10px;">
+                <div>
+                    <h2 class="section-title" style="font-size: 0.95rem;">Global M2 YoY 변화율 (%)</h2>
+                </div>
+            </div>
+            <div class="chart-legend">
+                <div class="legend-item"><span class="legend-box" style="background: rgba(0,212,170,0.7);"></span>양수 (유동성 확장)</div>
+                <div class="legend-item"><span class="legend-box" style="background: rgba(255,71,87,0.7);"></span>음수 (유동성 수축)</div>
+            </div>
+            <div class="m2-chart-container">
+                <canvas id="m2YoyChart"></canvas>
+            </div>
+        </section>
+
+        <div class="data-info" id="dataInfo">데이터 로딩 중...</div>
+
+        <div class="share-bar">
+            <button class="share-btn twitter" onclick="shareTwitter()">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                트위터
+            </button>
+            <button class="share-btn kakao" onclick="shareKakao()">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3C6.477 3 2 6.463 2 10.691c0 2.724 1.8 5.116 4.508 6.482-.144.525-.925 3.388-.958 3.603 0 0-.02.157.083.217.103.06.224.013.224.013.296-.041 3.434-2.263 3.973-2.652.703.098 1.428.15 2.17.15 5.523 0 10-3.463 10-7.813C22 6.463 17.523 3 12 3z"/></svg>
+                카카오톡
+            </button>
+            <button class="share-btn telegram" onclick="shareTelegram()">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                텔레그램
+            </button>
+            <button class="share-btn instagram" onclick="shareInstagram()">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+                인스타그램
+            </button>
+            <button class="share-btn copy-link" onclick="copyLink()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                링크 복사
+            </button>
+        </div>
+
+        <footer class="footer">
+            데이터: FRED (미국 M2) · ECB (유로존 M2) · BOJ (일본 M2)<br>
+            BTC: 일간 종가 → 주간 평균 · M2 YoY: 전년 동월 대비<br>
+            매월 자동 업데이트 · <a href="https://herdvibe.com" target="_blank">herdvibe.com</a>
+        </footer>
+    </div>
+
+    <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js" crossorigin="anonymous"></script>
+
+    <script>
+        const KAKAO_KEY = 'a43ed7b39fac35458f4f9df925a279b5';
+        const SHARE_URL = 'https://herdvibe.com/85';
+        const SHARE_TITLE = 'Bitcoin & Liquidity';
+        const SHARE_DESC = '비트코인과 글로벌 M2 YoY 변화율 비교 대시보드';
+
+        let DATA = null;
+        let BTC_DAILY = [];
+        let btcChart = null;
+        let m2YoyChart = null;
+        let currentPeriodMonths = 60; // default 5Y
+
+        // ============================================================
+        // CLIPBOARD HELPER
+        // ============================================================
+        async function copyToClipboard(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                try { await navigator.clipboard.writeText(text); return true; } catch(e) {}
+            }
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = text; ta.setAttribute('readonly', '');
+                Object.assign(ta.style, { position:'fixed', left:'-9999px', top:'-9999px', opacity:'0' });
+                document.body.appendChild(ta);
+                ta.focus(); ta.select(); ta.setSelectionRange(0, ta.value.length);
+                const ok = document.execCommand('copy');
+                document.body.removeChild(ta);
+                if (ok) return true;
+            } catch(e) {}
+            window.open(text, '_blank');
+            return false;
+        }
+
+        // ============================================================
+        // DATA LOADING
+        // ============================================================
+        async function loadData() {
+            try {
+                const [jsonRes, csvRes] = await Promise.all([
+                    fetch('data/m2_btc_data.json'),
+                    fetch('data/BTC_USD.csv')
+                ]);
+                DATA = await jsonRes.json();
+                const csvText = await csvRes.text();
+                parseBtcCsv(csvText);
+                initDashboard();
+            } catch (e) {
+                console.error('Data load failed:', e);
+                document.getElementById('btcChartWrap').innerHTML =
+                    '<div class="loading-overlay">데이터 로드 실패</div>';
+            }
+        }
+
+        function parseBtcCsv(text) {
+            const lines = text.trim().split('\n');
+            const header = lines[0].split(',');
+            const dateIdx = header.indexOf('Date');
+            const closeIdx = header.indexOf('Close');
+            if (dateIdx < 0 || closeIdx < 0) return;
+
+            BTC_DAILY = [];
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(',');
+                const d = cols[dateIdx], c = parseFloat(cols[closeIdx]);
+                if (d && !isNaN(c)) {
+                    BTC_DAILY.push({ date: d, close: c });
+                }
+            }
+            BTC_DAILY.sort((a, b) => a.date.localeCompare(b.date));
+        }
+
+        // ============================================================
+        // WEEKLY AGGREGATION
+        // ============================================================
+        function getWeekKey(dateStr) {
+            const d = new Date(dateStr);
+            // ISO week: Monday-based
+            const day = d.getDay() || 7;
+            d.setDate(d.getDate() + 4 - day);
+            const yearStart = new Date(d.getFullYear(), 0, 1);
+            const weekNo = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+            return `${d.getFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+        }
+
+        function getWeekStartDate(dateStr) {
+            const d = new Date(dateStr);
+            const day = d.getDay() || 7;
+            d.setDate(d.getDate() - (day - 1)); // Monday
+            return d.toISOString().slice(0, 10);
+        }
+
+        function aggregateWeekly() {
+            const weeks = {};
+            BTC_DAILY.forEach(item => {
+                const weekStart = getWeekStartDate(item.date);
+                if (!weeks[weekStart]) weeks[weekStart] = [];
+                weeks[weekStart].push(item.close);
+            });
+            const result = [];
+            Object.keys(weeks).sort().forEach(weekStart => {
+                const prices = weeks[weekStart];
+                const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+                result.push({ date: weekStart, price: Math.round(avg * 100) / 100 });
+            });
+            return result;
+        }
+
+        // ============================================================
+        // M2 YoY CALCULATION
+        // ============================================================
+        function calcM2Yoy() {
+            const m2 = DATA.global_m2;
+            const dates = Object.keys(m2).sort();
+            const yoy = {};
+            dates.forEach(d => {
+                const [y, m] = d.split('-').map(Number);
+                const prevDate = `${y - 1}-${String(m).padStart(2, '0')}`;
+                if (m2[prevDate]) {
+                    yoy[d] = ((m2[d] - m2[prevDate]) / m2[prevDate]) * 100;
+                }
+            });
+            return yoy;
+        }
+
+        // ============================================================
+        // PEAK / TROUGH DETECTION
+        // ============================================================
+        function findPeaksTroughs(weeklyData, windowSize = 16) {
+            const labels = [];
+            const n = weeklyData.length;
+            if (n < windowSize * 2) return labels;
+
+            for (let i = windowSize; i < n - windowSize; i++) {
+                let isPeak = true, isTrough = true;
+                const val = weeklyData[i].price;
+
+                for (let j = i - windowSize; j <= i + windowSize; j++) {
+                    if (j === i) continue;
+                    if (weeklyData[j].price >= val) isPeak = false;
+                    if (weeklyData[j].price <= val) isTrough = false;
+                }
+
+                if (isPeak) {
+                    labels.push({ index: i, date: weeklyData[i].date, price: val, type: 'peak' });
+                } else if (isTrough) {
+                    labels.push({ index: i, date: weeklyData[i].date, price: val, type: 'trough' });
+                }
+            }
+
+            // Also check recent end (last point if it's near ATH or significant)
+            return labels;
+        }
+
+        // ============================================================
+        // FILTER BY PERIOD
+        // ============================================================
+        function filterByPeriod(weeklyData, m2Yoy, periodMonths) {
+            if (periodMonths === 0) return { weekly: weeklyData, yoy: m2Yoy };
+
+            const cutoff = new Date();
+            cutoff.setMonth(cutoff.getMonth() - periodMonths);
+            const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+            const weekly = weeklyData.filter(d => d.date >= cutoffStr);
+            const yoy = {};
+            Object.keys(m2Yoy).forEach(d => {
+                if (d >= cutoffStr.slice(0, 7)) yoy[d] = m2Yoy[d];
+            });
+            return { weekly, yoy };
+        }
+
+        // ============================================================
+        // BUILD M2 YOY ZONE MAP (for BTC chart background)
+        // ============================================================
+        function getYoyZoneForDate(dateStr, m2Yoy) {
+            const ym = dateStr.slice(0, 7);
+            if (m2Yoy[ym] !== undefined) return m2Yoy[ym];
+            // Try previous month
+            const d = new Date(dateStr);
+            d.setMonth(d.getMonth() - 1);
+            const prevYm = d.toISOString().slice(0, 7);
+            if (m2Yoy[prevYm] !== undefined) return m2Yoy[prevYm];
+            return null;
+        }
+
+        // ============================================================
+        // CHART.JS BACKGROUND ZONES PLUGIN
+        // ============================================================
+        const bgZonePlugin = {
+            id: 'bgZones',
+            beforeDraw(chart) {
+                if (!chart.options.plugins.bgZones || !chart.options.plugins.bgZones.zones) return;
+                const { ctx, chartArea: { left, right, top, bottom }, scales: { x } } = chart;
+                const zones = chart.options.plugins.bgZones.zones;
+
+                ctx.save();
+                let prevZonePositive = null;
+                let zoneStart = left;
+
+                for (let i = 0; i < zones.length; i++) {
+                    const isPositive = zones[i] >= 0;
+                    const pixelX = x.getPixelForValue(i);
+
+                    if (prevZonePositive !== null && prevZonePositive !== isPositive) {
+                        // Draw previous zone
+                        ctx.fillStyle = prevZonePositive
+                            ? 'rgba(0, 212, 170, 0.05)'
+                            : 'rgba(255, 71, 87, 0.05)';
+                        ctx.fillRect(zoneStart, top, pixelX - zoneStart, bottom - top);
+                        zoneStart = pixelX;
+                    } else if (prevZonePositive === null) {
+                        prevZonePositive = isPositive;
+                    }
+                    prevZonePositive = isPositive;
+                }
+                // Draw last zone
+                if (prevZonePositive !== null) {
+                    ctx.fillStyle = prevZonePositive
+                        ? 'rgba(0, 212, 170, 0.05)'
+                        : 'rgba(255, 71, 87, 0.05)';
+                    ctx.fillRect(zoneStart, top, right - zoneStart, bottom - top);
+                }
+                ctx.restore();
+            }
+        };
+
+        // Peak/trough label plugin
+        const peakLabelPlugin = {
+            id: 'peakLabels',
+            afterDraw(chart) {
+                if (!chart.options.plugins.peakLabels || !chart.options.plugins.peakLabels.points) return;
+                const { ctx, scales: { x, y } } = chart;
+                const points = chart.options.plugins.peakLabels.points;
+
+                ctx.save();
+                ctx.font = '600 10px "JetBrains Mono", monospace';
+                ctx.textAlign = 'center';
+
+                points.forEach(p => {
+                    const px = x.getPixelForValue(p.index);
+                    const py = y.getPixelForValue(Math.log10(p.price));
+                    const isPeak = p.type === 'peak';
+
+                    const label = '$' + p.price.toLocaleString('en-US', { maximumFractionDigits: 0 });
+                    const yOffset = isPeak ? -14 : 18;
+
+                    // Background pill
+                    const metrics = ctx.measureText(label);
+                    const padX = 6, padY = 3;
+                    const bgX = px - metrics.width / 2 - padX;
+                    const bgY = py + yOffset - 8 - padY;
+                    const bgW = metrics.width + padX * 2;
+                    const bgH = 16 + padY * 2;
+
+                    ctx.fillStyle = isPeak ? 'rgba(247, 147, 26, 0.15)' : 'rgba(255, 71, 87, 0.15)';
+                    ctx.beginPath();
+                    ctx.roundRect(bgX, bgY, bgW, bgH, 4);
+                    ctx.fill();
+
+                    ctx.fillStyle = isPeak ? '#f7931a' : '#ff6b7a';
+                    ctx.fillText(label, px, py + yOffset);
+
+                    // Small dot
+                    ctx.beginPath();
+                    ctx.arc(px, py, 3, 0, Math.PI * 2);
+                    ctx.fillStyle = isPeak ? '#f7931a' : '#ff6b7a';
+                    ctx.fill();
+                });
+                ctx.restore();
+            }
+        };
+
+        // roundRect polyfill
+        if (!CanvasRenderingContext2D.prototype.roundRect) {
+            CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+                if (typeof r === 'number') r = [r, r, r, r];
+                this.moveTo(x + r[0], y);
+                this.lineTo(x + w - r[1], y);
+                this.quadraticCurveTo(x + w, y, x + w, y + r[1]);
+                this.lineTo(x + w, y + h - r[2]);
+                this.quadraticCurveTo(x + w, y + h, x + w - r[2], y + h);
+                this.lineTo(x + r[3], y + h);
+                this.quadraticCurveTo(x, y + h, x, y + h - r[3]);
+                this.lineTo(x, y + r[0]);
+                this.quadraticCurveTo(x, y, x + r[0], y);
+                this.closePath();
+                return this;
+            };
+        }
+
+        Chart.register(bgZonePlugin, peakLabelPlugin);
+
+        // ============================================================
+        // CREATE CHARTS
+        // ============================================================
+        function createCharts(periodMonths) {
+            const allWeekly = aggregateWeekly();
+            const allM2Yoy = calcM2Yoy();
+            const { weekly, yoy } = filterByPeriod(allWeekly, allM2Yoy, periodMonths);
+
+            if (weekly.length === 0) return;
+
+            // Build zone array matching weekly data
+            const zones = weekly.map(w => {
+                const v = getYoyZoneForDate(w.date, allM2Yoy);
+                return v !== null ? v : 0;
+            });
+
+            // Peak/trough detection
+            const windowSize = periodMonths === 0 ? 20 : periodMonths <= 36 ? 10 : 14;
+            const peaks = findPeaksTroughs(weekly, windowSize);
+
+            // Format labels
+            const btcLabels = weekly.map(w => {
+                const d = new Date(w.date);
+                const m = d.toLocaleString('en', { month: 'short' });
+                const y = String(d.getFullYear()).slice(2);
+                return `${m}-${y}`;
+            });
+            const btcData = weekly.map(w => Math.log10(w.price));
+
+            // ---- BTC Chart ----
+            if (btcChart) btcChart.destroy();
+            const btcCtx = document.getElementById('btcChart').getContext('2d');
+
+            btcChart = new Chart(btcCtx, {
+                type: 'line',
+                data: {
+                    labels: btcLabels,
+                    datasets: [{
+                        data: btcData,
+                        borderColor: '#f7931a',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        pointHoverBackgroundColor: '#f7931a',
+                        tension: 0.3,
+                        fill: false,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    layout: { padding: { top: 25, right: 10, bottom: 0, left: 10 } },
+                    plugins: {
+                        legend: { display: false },
+                        bgZones: { zones },
+                        peakLabels: { points: peaks },
+                        tooltip: {
+                            backgroundColor: '#1a1a1a',
+                            borderColor: '#333',
+                            borderWidth: 1,
+                            titleFont: { family: "'Noto Sans KR', sans-serif", size: 11 },
+                            bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+                            callbacks: {
+                                title: (items) => {
+                                    const idx = items[0].dataIndex;
+                                    return weekly[idx].date;
+                                },
+                                label: (item) => {
+                                    const idx = item.dataIndex;
+                                    const price = weekly[idx].price;
+                                    const yoyVal = getYoyZoneForDate(weekly[idx].date, allM2Yoy);
+                                    let label = `BTC: $${price.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+                                    if (yoyVal !== null) {
+                                        label += `  |  M2 YoY: ${yoyVal >= 0 ? '+' : ''}${yoyVal.toFixed(1)}%`;
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255,255,255,0.03)', drawTicks: false },
+                            ticks: {
+                                color: '#555', font: { family: "'JetBrains Mono', monospace", size: 10 },
+                                maxTicksLimit: 12, maxRotation: 0,
+                            },
+                            border: { color: '#2a2a2a' }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.03)', drawTicks: false },
+                            ticks: {
+                                color: '#555',
+                                font: { family: "'JetBrains Mono', monospace", size: 10 },
+                                callback: (val) => {
+                                    const real = Math.pow(10, val);
+                                    if (real >= 1000) return '$' + (real / 1000).toFixed(0) + 'K';
+                                    return '$' + real.toFixed(0);
+                                }
+                            },
+                            border: { color: '#2a2a2a' }
+                        }
+                    },
+                    interaction: { mode: 'index', intersect: false },
+                }
+            });
+
+            // ---- M2 YoY Bar Chart ----
+            if (m2YoyChart) m2YoyChart.destroy();
+            const yoyDates = Object.keys(yoy).sort();
+            const yoyLabels = yoyDates.map(d => {
+                const [y, m] = d.split('-');
+                return `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m)-1]}-${y.slice(2)}`;
+            });
+            const yoyValues = yoyDates.map(d => Math.round(yoy[d] * 100) / 100);
+            const yoyColors = yoyValues.map(v => v >= 0 ? 'rgba(0, 212, 170, 0.7)' : 'rgba(255, 71, 87, 0.7)');
+            const yoyBorderColors = yoyValues.map(v => v >= 0 ? 'rgba(0, 212, 170, 1)' : 'rgba(255, 71, 87, 1)');
+
+            const m2Ctx = document.getElementById('m2YoyChart').getContext('2d');
+            m2YoyChart = new Chart(m2Ctx, {
+                type: 'bar',
+                data: {
+                    labels: yoyLabels,
+                    datasets: [{
+                        data: yoyValues,
+                        backgroundColor: yoyColors,
+                        borderColor: yoyBorderColors,
+                        borderWidth: 1,
+                        borderRadius: 2,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    layout: { padding: { top: 5, right: 10, bottom: 0, left: 10 } },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#1a1a1a',
+                            borderColor: '#333',
+                            borderWidth: 1,
+                            titleFont: { family: "'Noto Sans KR', sans-serif", size: 11 },
+                            bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+                            callbacks: {
+                                title: (items) => yoyDates[items[0].dataIndex],
+                                label: (item) => {
+                                    const v = item.raw;
+                                    const d = yoyDates[item.dataIndex];
+                                    const m2Val = DATA.global_m2[d];
+                                    let lbl = `YoY: ${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
+                                    if (m2Val) lbl += `  |  M2: $${m2Val.toFixed(1)}T`;
+                                    return lbl;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255,255,255,0.03)', drawTicks: false },
+                            ticks: {
+                                color: '#555', font: { family: "'JetBrains Mono', monospace", size: 10 },
+                                maxTicksLimit: 12, maxRotation: 0,
+                            },
+                            border: { color: '#2a2a2a' }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.03)', drawTicks: false },
+                            ticks: {
+                                color: '#555',
+                                font: { family: "'JetBrains Mono', monospace", size: 10 },
+                                callback: (val) => val.toFixed(0) + '%'
+                            },
+                            border: { color: '#2a2a2a' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ============================================================
+        // SUMMARY CARDS
+        // ============================================================
+        function renderSummary() {
+            const weekly = aggregateWeekly();
+            const m2Yoy = calcM2Yoy();
+
+            // BTC latest weekly
+            if (weekly.length > 0) {
+                const latest = weekly[weekly.length - 1];
+                document.getElementById('card-btc-price').textContent =
+                    '$' + latest.price.toLocaleString('en-US', { maximumFractionDigits: 0 });
+                document.getElementById('card-btc-date').textContent = latest.date + ' 주';
+            }
+
+            // M2 latest
+            const m2Dates = Object.keys(DATA.global_m2).sort();
+            if (m2Dates.length > 0) {
+                const latestM2Date = m2Dates[m2Dates.length - 1];
+                const latestM2 = DATA.global_m2[latestM2Date];
+                document.getElementById('card-m2-total').textContent = `$${latestM2.toFixed(1)}T`;
+                const [my, mm] = latestM2Date.split('-');
+                document.getElementById('card-m2-date').textContent = `${my}년 ${parseInt(mm)}월`;
+
+                // M2 YoY
+                const yoyDates = Object.keys(m2Yoy).sort();
+                if (yoyDates.length > 0) {
+                    const latestYoyDate = yoyDates[yoyDates.length - 1];
+                    const latestYoy = m2Yoy[latestYoyDate];
+                    const yoyEl = document.getElementById('card-m2-yoy');
+                    yoyEl.textContent = `${latestYoy >= 0 ? '+' : ''}${latestYoy.toFixed(1)}%`;
+                    yoyEl.className = 'card-value ' + (latestYoy >= 0 ? 'positive' : 'negative');
+
+                    // Liquidity state
+                    const stateEl = document.getElementById('card-liquidity-state');
+                    const descEl = document.getElementById('card-liquidity-desc');
+                    if (latestYoy >= 8) {
+                        stateEl.textContent = '🟢 강한 확장';
+                        stateEl.className = 'card-value positive';
+                        descEl.textContent = 'M2 YoY 8%+ 고성장';
+                    } else if (latestYoy >= 4) {
+                        stateEl.textContent = '🟡 완만한 확장';
+                        stateEl.className = 'card-value';
+                        stateEl.style.color = 'var(--accent-yellow)';
+                        descEl.textContent = 'M2 YoY 4~8% 보통 성장';
+                    } else if (latestYoy >= 0) {
+                        stateEl.textContent = '🟠 저성장';
+                        stateEl.className = 'card-value';
+                        stateEl.style.color = '#f7931a';
+                        descEl.textContent = 'M2 YoY 0~4% 낮은 성장';
+                    } else {
+                        stateEl.textContent = '🔴 수축';
+                        stateEl.className = 'card-value negative';
+                        descEl.textContent = 'M2 YoY 마이너스 · 유동성 감소';
+                    }
+                }
+            }
+
+            // Data info
+            if (weekly.length > 0 && m2Dates.length > 0) {
+                document.getElementById('dataInfo').textContent =
+                    `Data as of ${DATA.last_updated} · BTC 주간 ${weekly.length}개 · M2 월간 ${m2Dates.length}개 · Past performance is no guarantee of future results.`;
+            }
+        }
+
+        // ============================================================
+        // INIT
+        // ============================================================
+        function initDashboard() {
+            try { renderSummary(); } catch(e) { console.error('Summary:', e); }
+            try { createCharts(currentPeriodMonths); } catch(e) { console.error('Charts:', e); }
+        }
+
+        // Period buttons
+        document.querySelectorAll('.period-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentPeriodMonths = parseInt(btn.dataset.months);
+                createCharts(currentPeriodMonths);
+            });
+        });
+
+        // ============================================================
+        // SHARING
+        // ============================================================
+        function shareTwitter() {
+            const text = `${SHARE_TITLE}\n비트코인과 글로벌 M2 유동성의 관계를 확인해보세요`;
+            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(SHARE_URL)}`, '_blank');
+        }
+
+        function shareKakao() {
+            if (!Kakao.isInitialized()) Kakao.init(KAKAO_KEY);
+            Kakao.Share.sendDefault({
+                objectType: 'feed',
+                content: { title: SHARE_TITLE, description: SHARE_DESC, imageUrl: '', link: { mobileWebUrl: SHARE_URL, webUrl: SHARE_URL } },
+                buttons: [{ title: '차트 보기', link: { mobileWebUrl: SHARE_URL, webUrl: SHARE_URL } }]
+            });
+        }
+
+        function shareTelegram() {
+            window.open(`https://t.me/share/url?url=${encodeURIComponent(SHARE_URL)}&text=${encodeURIComponent(SHARE_TITLE + ' - ' + SHARE_DESC)}`, '_blank');
+        }
+
+        function showCopied(btn, success) {
+            const orig = btn.innerHTML;
+            const origBorder = btn.style.borderColor;
+            const origColor = btn.style.color;
+            if (success) {
+                btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> 복사됨!';
+                btn.style.borderColor = 'var(--accent-green)';
+                btn.style.color = 'var(--accent-green)';
+            } else {
+                btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg> 새 탭에서 열림';
+                btn.style.borderColor = 'var(--accent-yellow)';
+                btn.style.color = 'var(--accent-yellow)';
+            }
+            setTimeout(() => { btn.innerHTML = orig; btn.style.borderColor = origBorder; btn.style.color = origColor; }, 2000);
+        }
+
+        async function shareInstagram() {
+            const ok = await copyToClipboard(SHARE_URL);
+            showCopied(document.querySelector('.instagram'), ok);
+        }
+
+        async function copyLink() {
+            const ok = await copyToClipboard(SHARE_URL);
+            showCopied(document.querySelector('.copy-link'), ok);
+        }
+
+        document.addEventListener('DOMContentLoaded', loadData);
+    </script>
+</body>
+</html>

@@ -688,28 +688,49 @@
                 }
             });
 
-            // ---- M2 YoY Bar Chart ----
+            // ---- M2 YoY Bar Chart (same X-axis as BTC) ----
             if (m2YoyChart) m2YoyChart.destroy();
-            const yoyDates = Object.keys(yoy).sort();
-            const yoyLabels = yoyDates.map(d => {
-                const [y, m] = d.split('-');
-                return `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m)-1]}-${y.slice(2)}`;
+
+            // Map weekly labels to M2 YoY: show bar only on first week of each month
+            const m2YoyWeekly = [];
+            const m2YoyWeeklyColors = [];
+            const m2YoyWeeklyBorders = [];
+            const m2YoyWeeklyMeta = []; // for tooltip
+            let lastShownMonth = '';
+
+            weekly.forEach((w, i) => {
+                const ym = w.date.slice(0, 7);
+                const yoyVal = getYoyZoneForDate(w.date, allM2Yoy);
+
+                if (ym !== lastShownMonth && yoyVal !== null) {
+                    // First week of a new month — show bar
+                    m2YoyWeekly.push(Math.round(yoyVal * 100) / 100);
+                    m2YoyWeeklyColors.push(yoyVal >= 0 ? 'rgba(0, 212, 170, 0.7)' : 'rgba(255, 71, 87, 0.7)');
+                    m2YoyWeeklyBorders.push(yoyVal >= 0 ? 'rgba(0, 212, 170, 1)' : 'rgba(255, 71, 87, 1)');
+                    m2YoyWeeklyMeta.push({ date: ym, yoy: yoyVal, m2: DATA.global_m2[ym] });
+                    lastShownMonth = ym;
+                } else {
+                    // Same month or no data — empty
+                    m2YoyWeekly.push(null);
+                    m2YoyWeeklyColors.push('transparent');
+                    m2YoyWeeklyBorders.push('transparent');
+                    m2YoyWeeklyMeta.push(null);
+                }
             });
-            const yoyValues = yoyDates.map(d => Math.round(yoy[d] * 100) / 100);
-            const yoyColors = yoyValues.map(v => v >= 0 ? 'rgba(0, 212, 170, 0.7)' : 'rgba(255, 71, 87, 0.7)');
-            const yoyBorderColors = yoyValues.map(v => v >= 0 ? 'rgba(0, 212, 170, 1)' : 'rgba(255, 71, 87, 1)');
 
             const m2Ctx = document.getElementById('m2YoyChart').getContext('2d');
             m2YoyChart = new Chart(m2Ctx, {
                 type: 'bar',
                 data: {
-                    labels: yoyLabels,
+                    labels: btcLabels, // SAME labels as BTC chart
                     datasets: [{
-                        data: yoyValues,
-                        backgroundColor: yoyColors,
-                        borderColor: yoyBorderColors,
+                        data: m2YoyWeekly,
+                        backgroundColor: m2YoyWeeklyColors,
+                        borderColor: m2YoyWeeklyBorders,
                         borderWidth: 1,
                         borderRadius: 2,
+                        barPercentage: 1.0,
+                        categoryPercentage: 1.0,
                     }]
                 },
                 options: {
@@ -724,14 +745,17 @@
                             borderWidth: 1,
                             titleFont: { family: "'Noto Sans KR', sans-serif", size: 11 },
                             bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+                            filter: (item) => item.raw !== null,
                             callbacks: {
-                                title: (items) => yoyDates[items[0].dataIndex],
+                                title: (items) => {
+                                    const meta = m2YoyWeeklyMeta[items[0].dataIndex];
+                                    return meta ? meta.date : '';
+                                },
                                 label: (item) => {
-                                    const v = item.raw;
-                                    const d = yoyDates[item.dataIndex];
-                                    const m2Val = DATA.global_m2[d];
-                                    let lbl = `YoY: ${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
-                                    if (m2Val) lbl += `  |  M2: $${m2Val.toFixed(1)}T`;
+                                    const meta = m2YoyWeeklyMeta[item.dataIndex];
+                                    if (!meta) return '';
+                                    let lbl = `YoY: ${meta.yoy >= 0 ? '+' : ''}${meta.yoy.toFixed(1)}%`;
+                                    if (meta.m2) lbl += `  |  M2: $${meta.m2.toFixed(1)}T`;
                                     return lbl;
                                 }
                             }

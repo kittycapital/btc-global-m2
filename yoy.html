@@ -286,7 +286,7 @@
 
     <script>
         const KAKAO_KEY = 'a43ed7b39fac35458f4f9df925a279b5';
-        const SHARE_URL = 'https://herdvibe.com/85';
+        const SHARE_URL = 'https://app.herdvibe.com/btc-global-m2/yoy.html';
         const SHARE_TITLE = 'Bitcoin & Liquidity';
         const SHARE_DESC = '비트코인과 글로벌 M2 YoY 변화율 비교 대시보드';
 
@@ -441,16 +441,21 @@
         // FILTER BY PERIOD
         // ============================================================
         function filterByPeriod(weeklyData, m2Yoy, periodMonths) {
-            if (periodMonths === 0) return { weekly: weeklyData, yoy: m2Yoy };
+            let weekly = weeklyData;
 
-            const cutoff = new Date();
-            cutoff.setMonth(cutoff.getMonth() - periodMonths);
-            const cutoffStr = cutoff.toISOString().slice(0, 10);
+            if (periodMonths > 0) {
+                const cutoff = new Date();
+                cutoff.setMonth(cutoff.getMonth() - periodMonths);
+                const cutoffStr = cutoff.toISOString().slice(0, 10);
+                weekly = weeklyData.filter(d => d.date >= cutoffStr);
+            }
 
-            const weekly = weeklyData.filter(d => d.date >= cutoffStr);
+            // M2 YoY 날짜를 BTC 주간 데이터 범위에 맞춤 (X축 동기화)
+            const btcStartYm = weekly.length > 0 ? weekly[0].date.slice(0, 7) : '2000-01';
+            const btcEndYm = weekly.length > 0 ? weekly[weekly.length - 1].date.slice(0, 7) : '2099-12';
             const yoy = {};
             Object.keys(m2Yoy).forEach(d => {
-                if (d >= cutoffStr.slice(0, 7)) yoy[d] = m2Yoy[d];
+                if (d >= btcStartYm && d <= btcEndYm) yoy[d] = m2Yoy[d];
             });
             return { weekly, yoy };
         }
